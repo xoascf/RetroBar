@@ -2,6 +2,7 @@
 using ManagedShell.Common.Logging.Observers;
 using System;
 using System.IO;
+using RetroBar.Extensions;
 
 namespace RetroBar.Utilities
 {

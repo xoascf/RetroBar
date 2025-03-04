@@ -5,6 +5,7 @@ using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
+using RetroBar.Extensions;
 
 namespace RetroBar.Utilities
 {

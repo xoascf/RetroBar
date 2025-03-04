@@ -16,5 +16,6 @@ namespace RetroBar.Utilities
         });
 
         internal static string GetExecutablePath() => LazyExecutablePath.Value;
+        internal static string GetExecutableBasePath() => System.IO.Path.GetDirectoryName(LazyExecutablePath.Value);
     }
 }

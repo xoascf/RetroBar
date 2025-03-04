@@ -1,29 +1,32 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.IO;
+using RetroBar.Utilities;
 
-internal static class ManagementExtensions
+namespace RetroBar.Extensions
 {
-    public static string InLocalAppData(this string path1, string path2 = "")
+    internal static class ManagementExtensions
     {
-        return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "RetroBar", path1, path2);
-    }
-
-    public static void AddFrom(this List<string> list, string path, string extension, bool skipExisting = false)
-    {
-        if (!Directory.Exists(path))
+        public static string InLocalAppData(this string path1, string path2 = "")
         {
-            return;
+            return Path.Combine(LocalAppDataPath.GetLocalAppDataAppPath(), path1, path2);
         }
 
-        foreach (string file in Directory.GetFiles(path, $"*.{extension}"))
+        public static void AddFrom(this List<string> list, string path, string extension, bool skipExisting = false)
         {
-            string fileName = Path.GetFileNameWithoutExtension(file);
-            if (skipExisting && list.Contains(fileName))
+            if (!Directory.Exists(path))
             {
-                continue;
+                return;
             }
-            list.Add(fileName);
+
+            foreach (string file in Directory.GetFiles(path, $"*.{extension}"))
+            {
+                string fileName = Path.GetFileNameWithoutExtension(file);
+                if (skipExisting && list.Contains(fileName))
+                {
+                    continue;
+                }
+                list.Add(fileName);
+            }
         }
     }
 }
