@@ -10,8 +10,10 @@
     <s:String x:Key="autostart">_Iniciar automáticamente al iniciar sesión</s:String>
     <s:String x:Key="language_text">Idi_oma:</s:String>
     <s:String x:Key="language_tip">Seleccione el idioma a usar.</s:String>
+    <s:String x:Key="language_system">Sistema</s:String>
     <s:String x:Key="theme_text">_Tema:</s:String>
     <s:String x:Key="theme_tip">Instale temas en la carpeta Themes.</s:String>
+    <s:String x:Key="theme_system">Sistema</s:String>
     <s:String x:Key="location_text">_Ubicación:</s:String>
     <s:String x:Key="location_tip">Cambie la ubicación de la barra de tareas en pantalla.</s:String>
     <x:Array x:Key="location_values" Type="s:String">

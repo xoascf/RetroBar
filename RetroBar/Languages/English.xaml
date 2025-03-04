@@ -10,8 +10,10 @@
     <s:String x:Key="autostart">Automatically start at _logon</s:String>
     <s:String x:Key="language_text">Lan_guage:</s:String>
     <s:String x:Key="language_tip">Select the language to use.</s:String>
+    <s:String x:Key="language_system">System</s:String>
     <s:String x:Key="theme_text">_Theme:</s:String>
     <s:String x:Key="theme_tip">Install themes in the Themes folder.</s:String>
+    <s:String x:Key="theme_system">System</s:String>
     <s:String x:Key="location_text">Locat_ion:</s:String>
     <s:String x:Key="location_tip">Change the taskbar location on screen.</s:String>
     <x:Array x:Key="location_values" Type="s:String">
