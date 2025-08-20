@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.IO;
 using System.Linq;
@@ -11,154 +10,158 @@ namespace RetroBar.Utilities
 {
     public class DictionaryManager : IDisposable
     {
-        private const string DICT_DEFAULT = "System";
+        private const string SYSTEM_NAME = "System";
         private const string DICT_EXT = "xaml";
 
-        private const string LANG_DEFAULT = DICT_DEFAULT;
         private const string LANG_FALLBACK = "English";
         private const string LANG_FOLDER = "Languages";
-        private const string LANG_EXT = DICT_EXT;
 
-        public const string THEME_DEFAULT = DICT_DEFAULT;
         private const string THEME_FOLDER = "Themes";
-        private const string THEME_EXT = DICT_EXT;
+        public const string THEME_DEFAULT = SYSTEM_NAME;
+
+        // Keep track of currently loaded dictionaries for proper cleanup
+        private readonly HashSet<ResourceDictionary> _loadedThemes = [];
+        private readonly HashSet<ResourceDictionary> _loadedLanguages = [];
 
         public DictionaryManager()
         {
             Settings.Instance.PropertyChanged += Settings_PropertyChanged;
+
+            // Load initial resources
+            SetLanguageFromSettings();
+            SetThemeFromSettings();
         }
 
         public void SetThemeFromSettings()
         {
-            SetTheme(THEME_DEFAULT);
+            string theme = Settings.Instance.Theme;
 
-            if (Settings.Instance.Theme.StartsWith(THEME_DEFAULT))
+            // Clear existing theme dictionaries
+            ClearDictionaries(_loadedThemes);
+
+            // Always load base system theme first
+            LoadDictionary(SYSTEM_NAME, THEME_FOLDER, _loadedThemes);
+
+            // Load specific theme if different from system
+            if (!string.Equals(theme, SYSTEM_NAME, StringComparison.OrdinalIgnoreCase))
             {
-                SetSystemThemeParams();
+                LoadDictionary(theme, THEME_FOLDER, _loadedThemes);
+            }
+
+            // Handle system theme parameters
+            if (theme.StartsWith(SYSTEM_NAME, StringComparison.OrdinalIgnoreCase))
+            {
+                Application.Current.Resources["GlobalFontFamily"] = SystemFonts.CaptionFontFamily;
             }
             else
             {
-                ClearSystemThemeParams();
-            }
-
-            if (Settings.Instance.Theme != THEME_DEFAULT)
-            {
-                SetTheme(Settings.Instance.Theme);
-            }
-        }
-
-        private void SetSystemThemeParams()
-        {
-            Application.Current.Resources["GlobalFontFamily"] = SystemFonts.CaptionFontFamily;
-        }
-
-        private void ClearSystemThemeParams()
-        {
-            Application.Current.Resources.Remove("GlobalFontFamily");
-        }
-
-        private void SetTheme(string theme)
-        {
-            SetDictionary(theme, THEME_FOLDER, THEME_DEFAULT, THEME_EXT, DictionaryType.Theme);
-        }
-
-        private static Collection<ResourceDictionary> GetMergedDictionaries()
-        {
-            return Application.Current.Resources.MergedDictionaries;
-        }
-
-        private static ResourceDictionary GetActualThemeDictionary()
-        {
-            foreach (ResourceDictionary rd in GetMergedDictionaries()
-                .Where(rd => rd.Source.ToString().Contains($"{THEME_FOLDER}/")))
-            {
-                return rd;
-            }
-
-            return null;
-        }
-
-        private void ClearPreviousThemes()
-        {
-            if (GetActualThemeDictionary() != null)
-            {
-                _ = GetMergedDictionaries().Remove(GetActualThemeDictionary());
+                Application.Current.Resources.Remove("GlobalFontFamily");
             }
         }
 
         public void SetLanguageFromSettings()
         {
-            SetLanguage(LANG_FALLBACK);
-            if (Settings.Instance.Language == LANG_DEFAULT)
+            string language = Settings.Instance.Language;
+
+            // Clear existing language dictionaries
+            ClearDictionaries(_loadedLanguages);
+
+            // Always load fallback English first
+            LoadDictionary(LANG_FALLBACK, LANG_FOLDER, _loadedLanguages);
+
+            if (language == SYSTEM_NAME)
             {
+                // Load system language(s)
                 var currentUICulture = System.Globalization.CultureInfo.CurrentUICulture;
                 string systemLanguageParent = currentUICulture.Parent.NativeName;
                 string systemLanguage = currentUICulture.NativeName;
-                ManagedShell.Common.Logging.ShellLogger.Info
-                    ($"Loading system language (if available): {systemLanguageParent}, {systemLanguage}");
-                SetLanguage(systemLanguageParent);
-                SetLanguage(systemLanguage);
+
+                ManagedShell.Common.Logging.ShellLogger.Info($"Loading system language: {systemLanguageParent}, {systemLanguage}");
+
+                // Load parent language first, then specific
+                LoadDictionary(systemLanguageParent, LANG_FOLDER, _loadedLanguages);
+                LoadDictionary(systemLanguage, LANG_FOLDER, _loadedLanguages);
             }
-            else
+            else if (!string.Equals(language, LANG_FALLBACK, StringComparison.OrdinalIgnoreCase))
             {
-                SetLanguage(Settings.Instance.Language);
+                // Load specific language
+                LoadDictionary(language, LANG_FOLDER, _loadedLanguages);
             }
         }
 
-        private void SetLanguage(string language)
+        private void ClearDictionaries(HashSet<ResourceDictionary> trackedDictionaries)
         {
-            SetDictionary(language, LANG_FOLDER, LANG_FALLBACK, LANG_EXT, DictionaryType.Language);
+            var mergedDictionaries = Application.Current.Resources.MergedDictionaries;
+
+            // Remove tracked dictionaries from the application resources
+            foreach (var dict in trackedDictionaries.ToList())
+            {
+                mergedDictionaries.Remove(dict);
+
+                // Properly dispose of resources if the dictionary implements IDisposable
+                if (dict is IDisposable disposable)
+                {
+                    disposable.Dispose();
+                }
+            }
+
+            trackedDictionaries.Clear();
+
+            // Force garbage collection to help with memory cleanup
+            GC.Collect();
+            GC.WaitForPendingFinalizers();
         }
 
-        private void SetDictionary(string dictionary, string dictFolder, string dictDefault, string dictExtension, DictionaryType dictType)
+        private bool LoadDictionary(string name, string folder, HashSet<ResourceDictionary> tracker)
         {
-            string dictFilePath;
+            if (string.IsNullOrWhiteSpace(name))
+                return false;
 
-            if (dictionary == dictDefault)
-            {
-                if (dictType == DictionaryType.Theme)
-                {
-                    ClearPreviousThemes();
-                }
-                dictFilePath = Path.ChangeExtension(Path.Combine(dictFolder, dictDefault), dictExtension);
-            }
-            else
-            {
-                // Built-in dictionary
-                dictFilePath = Path.ChangeExtension(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, dictFolder, dictionary),
-                                                    dictExtension);
-
-                if (!File.Exists(dictFilePath))
-                {
-                    // Installed dictionary in AppData directory
-                    dictFilePath = Path.ChangeExtension(dictFolder.InLocalAppData(dictionary), dictExtension);
-
-                    if (!File.Exists(dictFilePath))
-                    {
-                        // Custom dictionary in app directory
-                        dictFilePath =
-                            Path.ChangeExtension(Path.Combine(ExePath.GetExecutableBasePath(), dictFolder, dictionary),
-                                                 dictExtension);
-
-                        if (!File.Exists(dictFilePath))
-                        {
-                            return;
-                        }
-                    }
-                }
-            }
+            string dictionaryPath = FindDictionaryFile(name, folder);
+            if (string.IsNullOrEmpty(dictionaryPath))
+                return false;
 
             try
             {
-                GetMergedDictionaries().Add(new ResourceDictionary()
+                var resourceDictionary = new ResourceDictionary
                 {
-                    Source = new Uri(dictFilePath, UriKind.RelativeOrAbsolute)
-                });
+                    Source = new Uri(dictionaryPath, UriKind.RelativeOrAbsolute)
+                };
+
+                Application.Current.Resources.MergedDictionaries.Add(resourceDictionary);
+                tracker.Add(resourceDictionary);
+
+                return true;
             }
             catch (Exception e)
             {
-                ManagedShell.Common.Logging.ShellLogger.Error($"Error loading dictionaries: {e.Message} {e.InnerException?.Message}");
+                ManagedShell.Common.Logging.ShellLogger.Error($"Error loading dictionary '{dictionaryPath}': {e.Message}");
+                return false;
             }
+        }
+
+        private string FindDictionaryFile(string name, string folder)
+        {
+            string filename = Path.ChangeExtension(name, DICT_EXT);
+
+            // Search paths in order of priority
+            var searchPaths = new[]
+            {
+                Path.Combine(AppDomain.CurrentDomain.BaseDirectory, folder),
+                folder.InLocalAppData(),
+                Path.Combine(ExePath.GetExecutableBasePath(), folder)
+            };
+
+            foreach (var path in searchPaths.Where(p => !string.IsNullOrWhiteSpace(p)))
+            {
+                string fullPath = Path.Combine(path, filename);
+                if (File.Exists(fullPath))
+                {
+                    return fullPath;
+                }
+            }
+
+            return null;
         }
 
         public string GetThemeInstallDir()
@@ -168,55 +171,60 @@ namespace RetroBar.Utilities
 
         public List<string> GetThemes()
         {
-            return GetDictionaries(THEME_DEFAULT, THEME_FOLDER, THEME_EXT);
+            return GetAvailableDictionaries(THEME_FOLDER, SYSTEM_NAME);
         }
 
         public List<string> GetLanguages()
         {
-            List<string> languages = new List<string> { LANG_DEFAULT };
-            languages.AddRange(GetDictionaries(LANG_FALLBACK, LANG_FOLDER, LANG_EXT));
-            return languages;
+            var languages = new List<string> { SYSTEM_NAME };
+            languages.AddRange(GetAvailableDictionaries(LANG_FOLDER, LANG_FALLBACK));
+            return [.. languages.Distinct()];
         }
 
-        private List<string> GetDictionaries(string dictDefault, string dictFolder, string dictExtension)
+        private List<string> GetAvailableDictionaries(string folder, string defaultName)
         {
-            List<string> dictionaries = new List<string> { dictDefault };
+            var dictionaries = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { defaultName };
 
-            // Built-in dictionaries
-            dictionaries.AddFrom(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, dictFolder), dictExtension);
+            var searchPaths = new[]
+            {
+                Path.Combine(AppDomain.CurrentDomain.BaseDirectory, folder),
+                folder.InLocalAppData(),
+                Path.Combine(ExePath.GetExecutableBasePath(), folder)
+            };
 
-            // Installed AppData dictionaries
-            dictionaries.AddFrom(dictFolder.InLocalAppData(), dictExtension);
+            foreach (var path in searchPaths.Where(Directory.Exists))
+            {
+                var files = Directory.GetFiles(path, $"*.{DICT_EXT}");
+                foreach (var file in files)
+                {
+                    string name = Path.GetFileNameWithoutExtension(file);
+                    dictionaries.Add(name);
+                }
+            }
 
-            // Same-folder dictionaries
-            // Because RetroBar is published as a single-file app, it gets extracted to a temp directory, so custom dictionaries won't be there.
-            // Get the executable path to find the custom dictionaries directory when not a debug build.
-            dictionaries.AddFrom(Path.Combine(ExePath.GetExecutableBasePath(), dictFolder), dictExtension, true);
-
-            return dictionaries;
+            return [.. dictionaries];
         }
 
         private void Settings_PropertyChanged(object sender, PropertyChangedEventArgs e)
         {
-            if (e.PropertyName == nameof(Settings.Language))
+            switch (e.PropertyName)
             {
-                SetLanguageFromSettings();
-            }
-            if (e.PropertyName == nameof(Settings.Theme))
-            {
-                SetThemeFromSettings();
+                case nameof(Settings.Language):
+                    SetLanguageFromSettings();
+                    break;
+                case nameof(Settings.Theme):
+                    SetThemeFromSettings();
+                    break;
             }
         }
 
         public void Dispose()
         {
             Settings.Instance.PropertyChanged -= Settings_PropertyChanged;
-        }
 
-        private enum DictionaryType
-        {
-            Language,
-            Theme
+            // Clean up all tracked dictionaries
+            ClearDictionaries(_loadedThemes);
+            ClearDictionaries(_loadedLanguages);
         }
     }
 }
