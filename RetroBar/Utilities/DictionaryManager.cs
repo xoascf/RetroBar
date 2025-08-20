@@ -181,6 +181,134 @@ namespace RetroBar.Utilities
             return [.. languages.Distinct()];
         }
 
+        /// <summary>
+        /// Gets display names for themes with localized "System" string
+        /// </summary>
+        /// <returns>List of theme display names</returns>
+        public List<string> GetThemeDisplayNames()
+        {
+            var themes = GetThemes();
+            return themes.Select(GetThemeDisplayName).ToList();
+        }
+
+        /// <summary>
+        /// Gets display names for languages with localized "System" string
+        /// </summary>
+        /// <returns>List of language display names</returns>
+        public List<string> GetLanguageDisplayNames()
+        {
+            var languages = GetLanguages();
+            return languages.Select(GetLanguageDisplayName).ToList();
+        }
+
+        /// <summary>
+        /// Gets the localized display name for a theme
+        /// </summary>
+        /// <param name="themeSettingValue">The theme setting value</param>
+        /// <returns>The localized display name</returns>
+        public string GetThemeDisplayName(string themeSettingValue)
+        {
+            if (string.Equals(themeSettingValue, SYSTEM_NAME, StringComparison.OrdinalIgnoreCase))
+            {
+                return GetLocalizedString("theme_system") ?? SYSTEM_NAME;
+            }
+            return themeSettingValue;
+        }
+
+        /// <summary>
+        /// Gets the localized display name for a language
+        /// </summary>
+        /// <param name="languageSettingValue">The language setting value</param>
+        /// <returns>The localized display name</returns>
+        public string GetLanguageDisplayName(string languageSettingValue)
+        {
+            if (string.Equals(languageSettingValue, SYSTEM_NAME, StringComparison.OrdinalIgnoreCase))
+            {
+                return GetLocalizedString("language_system") ?? SYSTEM_NAME;
+            }
+            return languageSettingValue;
+        }
+
+        /// <summary>
+        /// Converts a theme display name back to the setting value
+        /// </summary>
+        /// <param name="displayName">The display name</param>
+        /// <returns>The setting value</returns>
+        public string GetThemeSettingValue(string displayName)
+        {
+            // Check if this is the localized "System" string
+            string localizedSystem = GetLocalizedString("theme_system");
+            if (localizedSystem != null && string.Equals(displayName, localizedSystem, StringComparison.OrdinalIgnoreCase))
+            {
+                return SYSTEM_NAME;
+            }
+
+            // Check if this is the English "System" string
+            if (string.Equals(displayName, SYSTEM_NAME, StringComparison.OrdinalIgnoreCase))
+            {
+                return SYSTEM_NAME;
+            }
+
+            return displayName;
+        }
+
+        /// <summary>
+        /// Converts a language display name back to the setting value
+        /// </summary>
+        /// <param name="displayName">The display name</param>
+        /// <returns>The setting value</returns>
+        public string GetLanguageSettingValue(string displayName)
+        {
+            // Check if this is the localized "System" string
+            string localizedSystem = GetLocalizedString("language_system");
+            if (localizedSystem != null && string.Equals(displayName, localizedSystem, StringComparison.OrdinalIgnoreCase))
+            {
+                return SYSTEM_NAME;
+            }
+
+            // Check if this is the English "System" string
+            if (string.Equals(displayName, SYSTEM_NAME, StringComparison.OrdinalIgnoreCase))
+            {
+                return SYSTEM_NAME;
+            }
+
+            return displayName;
+        }
+
+        /// <summary>
+        /// Gets a localized string from the current application resources
+        /// </summary>
+        /// <param name="key">The resource key</param>
+        /// <returns>The localized string or null if not found</returns>
+        private string GetLocalizedString(string key)
+        {
+            try
+            {
+                var resource = Application.Current.FindResource(key);
+                return resource as string;
+            }
+            catch
+            {
+                // If the key is not found in the current language, try to get it from the English fallback
+                try
+                {
+                    // First try to find in merged dictionaries that might contain English
+                    foreach (var dict in Application.Current.Resources.MergedDictionaries.Reverse())
+                    {
+                        if (dict.Contains(key))
+                        {
+                            return dict[key] as string;
+                        }
+                    }
+                }
+                catch
+                {
+                    // Ignore and return null
+                }
+                return null;
+            }
+        }
+
         private List<string> GetAvailableDictionaries(string folder, string defaultName)
         {
             var dictionaries = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { defaultName };

@@ -106,6 +106,8 @@ namespace RetroBar
             {
                 LoadVersion();
                 LoadClockActions();
+                // Reload display names when language changes
+                RefreshDisplayNames();
             }
         }
 
@@ -169,10 +171,18 @@ namespace RetroBar
 
         private void LoadLanguages()
         {
-            foreach (var language in _dictionaryManager.GetLanguages())
+            // Clear and reload with display names
+            cboLanguageSelect.Items.Clear();
+            
+            var languageDisplayNames = _dictionaryManager.GetLanguageDisplayNames();
+            foreach (var displayName in languageDisplayNames)
             {
-                cboLanguageSelect.Items.Add(language);
+                cboLanguageSelect.Items.Add(displayName);
             }
+
+            // Set the selected item to the current setting's display name
+            string currentDisplayName = _dictionaryManager.GetLanguageDisplayName(Settings.Instance.Language);
+            cboLanguageSelect.SelectedItem = currentDisplayName;
         }
 
         private void LoadOSSupport()
@@ -194,10 +204,19 @@ namespace RetroBar
 
         private void LoadThemes()
         {
-            foreach (var theme in _dictionaryManager.GetThemes())
+            // Clear and reload with display names
+            cboThemeSelect.Items.Clear();
+            
+            var themeDisplayNames = _dictionaryManager.GetThemeDisplayNames();
+            foreach (var displayName in themeDisplayNames)
             {
-                cboThemeSelect.Items.Add(theme);
+                cboThemeSelect.Items.Add(displayName);
             }
+
+            // Set the selected item to the current setting's display name
+            string currentDisplayName = _dictionaryManager.GetThemeDisplayName(Settings.Instance.Theme);
+            cboThemeSelect.SelectedItem = currentDisplayName;
+
             try
             {
                 string path = _dictionaryManager.GetThemeInstallDir();
@@ -216,14 +235,30 @@ namespace RetroBar
             }
         }
 
+        private void RefreshDisplayNames()
+        {
+            // Reload language and theme display names when language changes
+            string selectedLanguage = Settings.Instance.Language;
+            string selectedTheme = Settings.Instance.Theme;
+            
+            LoadLanguages();
+            LoadThemes();
+            
+            // Ensure the correct items are still selected
+            cboLanguageSelect.SelectedItem = _dictionaryManager.GetLanguageDisplayName(selectedLanguage);
+            cboThemeSelect.SelectedItem = _dictionaryManager.GetThemeDisplayName(selectedTheme);
+        }
+
         private void ThemesWatcher_Created(object sender, FileSystemEventArgs e)
         {
             string newTheme = Path.GetFileNameWithoutExtension(e.FullPath);
+            string newThemeDisplayName = _dictionaryManager.GetThemeDisplayName(newTheme);
+            
             Dispatcher.BeginInvoke(() => 
             {
-                if (!cboThemeSelect.Items.Contains(newTheme))
+                if (!cboThemeSelect.Items.Contains(newThemeDisplayName))
                 {
-                    cboThemeSelect.Items.Add(newTheme);
+                    cboThemeSelect.Items.Add(newThemeDisplayName);
                 }
             });
         }
@@ -231,15 +266,17 @@ namespace RetroBar
         private void ThemesWatcher_Deleted(object sender, FileSystemEventArgs e)
         {
             string removedTheme = Path.GetFileNameWithoutExtension(e.FullPath);
+            string removedThemeDisplayName = _dictionaryManager.GetThemeDisplayName(removedTheme);
+            
             Dispatcher.BeginInvoke(() =>
             {
-                if (cboThemeSelect.Items.Contains(removedTheme))
+                if (cboThemeSelect.Items.Contains(removedThemeDisplayName))
                 {
-                    if (cboThemeSelect.SelectedItem is string selected && selected == removedTheme)
+                    if (cboThemeSelect.SelectedItem is string selected && selected == removedThemeDisplayName)
                     {
                         cboThemeSelect.SelectedIndex = 0;
                     }
-                    cboThemeSelect.Items.Remove(removedTheme);
+                    cboThemeSelect.Items.Remove(removedThemeDisplayName);
                 }
             });
         }
@@ -248,19 +285,22 @@ namespace RetroBar
         {
             string removedTheme = Path.GetFileNameWithoutExtension(e.OldFullPath);
             string newTheme = Path.GetFileNameWithoutExtension(e.FullPath);
+            string removedThemeDisplayName = _dictionaryManager.GetThemeDisplayName(removedTheme);
+            string newThemeDisplayName = _dictionaryManager.GetThemeDisplayName(newTheme);
+            
             Dispatcher.BeginInvoke(() =>
             {
-                if (cboThemeSelect.Items.Contains(removedTheme))
+                if (cboThemeSelect.Items.Contains(removedThemeDisplayName))
                 {
-                    if (cboThemeSelect.SelectedItem is string selected && selected == removedTheme)
+                    if (cboThemeSelect.SelectedItem is string selected && selected == removedThemeDisplayName)
                     {
                         cboThemeSelect.SelectedIndex = 0;
                     }
-                    cboThemeSelect.Items.Remove(removedTheme);
+                    cboThemeSelect.Items.Remove(removedThemeDisplayName);
                 }
-                if (!cboThemeSelect.Items.Contains(newTheme))
+                if (!cboThemeSelect.Items.Contains(newThemeDisplayName))
                 {
-                    cboThemeSelect.Items.Add(newTheme);
+                    cboThemeSelect.Items.Add(newThemeDisplayName);
                 }
             });
         }
@@ -447,6 +487,30 @@ namespace RetroBar
             else if (e.RemovedItems.Count > 0 && e.RemovedItems[0] == cboWinNumHotkeysAction.Items[0])
             {
                 System.Windows.MessageBox.Show((string)System.Windows.Application.Current.FindResource("hotkey_warning_text"), (string)System.Windows.Application.Current.FindResource("hotkey_warning_title"), MessageBoxButton.OK, MessageBoxImage.Information);
+            }
+        }
+
+        private void CboLanguageSelect_SelectionChanged(object sender, System.Windows.Controls.SelectionChangedEventArgs e)
+        {
+            if (cboLanguageSelect.SelectedItem is string selectedDisplayName)
+            {
+                string settingValue = _dictionaryManager.GetLanguageSettingValue(selectedDisplayName);
+                if (Settings.Instance.Language != settingValue)
+                {
+                    Settings.Instance.Language = settingValue;
+                }
+            }
+        }
+
+        private void CboThemeSelect_SelectionChanged(object sender, System.Windows.Controls.SelectionChangedEventArgs e)
+        {
+            if (cboThemeSelect.SelectedItem is string selectedDisplayName)
+            {
+                string settingValue = _dictionaryManager.GetThemeSettingValue(selectedDisplayName);
+                if (Settings.Instance.Theme != settingValue)
+                {
+                    Settings.Instance.Theme = settingValue;
+                }
             }
         }
 

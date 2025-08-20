@@ -182,7 +182,7 @@
                                                 ToolTip="{DynamicResource language_tip}" />
                                 </Label>
                                 <ComboBox x:Name="cboLanguageSelect"
-                                          SelectedValue="{Binding Source={x:Static Settings:Settings.Instance}, Path=Language, UpdateSourceTrigger=PropertyChanged}" />
+                                          SelectionChanged="CboLanguageSelect_SelectionChanged" />
                             </DockPanel>
                             <DockPanel>
                                 <Label VerticalAlignment="Center"
@@ -191,7 +191,7 @@
                                                 ToolTip="{DynamicResource theme_tip}" />
                                 </Label>
                                 <ComboBox x:Name="cboThemeSelect"
-                                          SelectedValue="{Binding Source={x:Static Settings:Settings.Instance}, Path=Theme, UpdateSourceTrigger=PropertyChanged}" />
+                                          SelectionChanged="CboThemeSelect_SelectionChanged" />
                             </DockPanel>
                             <DockPanel>
                                 <Label VerticalAlignment="Center"
